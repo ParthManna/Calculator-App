@@ -1,11 +1,18 @@
 package com.example.addition
 
+import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
+import android.view.Menu
+import android.view.MenuItem
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
+import androidx.lifecycle.Observer
+import androidx.lifecycle.lifecycleScope
 import com.example.addition.databinding.ActivityMainBinding
-
+import kotlinx.coroutines.launch
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 class MainActivity : AppCompatActivity() {
 
@@ -16,38 +23,46 @@ class MainActivity : AppCompatActivity() {
     private var input: String = ""
     private var operatorPressed: Boolean = false
 
+    private lateinit var appDatabase: AppDatabase
+    private lateinit var todoDao: TodoDao
+
+    companion object {
+        const val PLUS = "+"
+        const val MINUS = "-"
+        const val MULTIPLY = "*"
+        const val DIVIDE = "/"
+        const val MODULO = "%"
+        const val SQUARE_ROOT = "√"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
 
         // Initialize View Binding
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Set up the click listeners for the numeric buttons
-        setupNumberButtons()
+        // Set up Room database instance
+        appDatabase = AppDatabase.getDatabase(this)
+        todoDao = appDatabase.todoDao()
 
-        // Set up the click listeners for the operator buttons
-        setupOperatorButtons()
+        setSupportActionBar(binding.toolbar)
+        setupButtonListeners()
 
-        // Set up the click listener for the equals button
-        binding.btnEquals.setOnClickListener {
-            calculateResult()
+        // Observer for tasks
+        val tasksObserver = Observer<List<TodoModel>> { tasks ->
+            // You can update the UI here if you want to display the list of tasks
         }
-
-        // Set up the clear button
-        binding.btnClear.setOnClickListener {
-            clearInput()
-        }
-
-        // Set up the delete button
-        binding.btnDelete.setOnClickListener {
-            deleteLastChar()
-        }
+        // Get the LiveData from the Dao and observe it
+        todoDao.getTask().observe(this, tasksObserver)
     }
 
-    // Function to handle numeric button clicks
+    private fun setupButtonListeners() {
+        setupNumberButtons()
+        setupOperatorButtons()
+        setupSpecialButtons()
+    }
+
     private fun setupNumberButtons() {
         binding.btn0.setOnClickListener { appendInput("0") }
         binding.btn1.setOnClickListener { appendInput("1") }
@@ -62,97 +77,145 @@ class MainActivity : AppCompatActivity() {
         binding.btnDot.setOnClickListener { appendInput(".") }
     }
 
-    // Function to handle operator button clicks
     private fun setupOperatorButtons() {
-        binding.btnPlus.setOnClickListener { appendOperator("+") }
-        binding.btnMinus.setOnClickListener { appendOperator("-") }
-        binding.btnMultiply.setOnClickListener { appendOperator("*") }
-        binding.btnDivide.setOnClickListener { appendOperator("/") }
-        binding.btnPercent.setOnClickListener { appendOperator("%") }
+        binding.btnPlus.setOnClickListener { appendOperator(PLUS) }
+        binding.btnMinus.setOnClickListener { appendOperator(MINUS) }
+        binding.btnMultiply.setOnClickListener { appendOperator(MULTIPLY) }
+        binding.btnDivide.setOnClickListener { appendOperator(DIVIDE) }
+        binding.btnPercent.setOnClickListener { appendOperator(MODULO) }
+        binding.btnRoot.setOnClickListener { appendOperator(SQUARE_ROOT) }
     }
 
-    // Append number or dot to input
+    private fun setupSpecialButtons() {
+        binding.btnEquals.setOnClickListener { calculateResult() }
+        binding.btnClear.setOnClickListener { clearInput() }
+        binding.btnDelete.setOnClickListener { deleteLastChar() }
+    }
+
     private fun appendInput(value: String) {
-        if (operatorPressed) {
-            // Clear input on new operator sequence
-            binding.display.text = ""
-            operatorPressed = false
+        if (value == "." && input.takeLastWhile { it.isDigit() || it == '.' }.contains(".")) return
+        if (value == "." && input.isEmpty()) input += "0"
+        if (operatorPressed) operatorPressed = false
+        input += value
+        binding.display.text = input.toEditable()
+    }
+
+    private fun appendOperator(operator: String) {
+        if (operator == SQUARE_ROOT) {
+            input = "$SQUARE_ROOT($input)"
+            binding.display.text = input.toEditable()
+            return
         }
 
-        input += value
-        binding.display.text = input
-    }
-
-    // Append operator and ensure no duplicate operators
-    private fun appendOperator(operator: String) {
         if (input.isNotEmpty() && !operatorPressed) {
             input += " $operator "
-            binding.display.text = input
+            binding.display.text = input.toEditable()
             operatorPressed = true
         }
     }
 
-    // Function to calculate the result when '=' is pressed
     private fun calculateResult() {
         try {
-            // Basic evaluation of the input string
+            val input_database = input
             val tokens = input.split(" ")
-
-            // Create a mutable list to handle the calculation
-            val values = mutableListOf<Double>()
+            val values = mutableListOf<BigDecimal>()
             val operators = mutableListOf<String>()
 
-            // Parse the tokens
             for (token in tokens) {
                 when {
                     token.toDoubleOrNull() != null -> {
-                        // If it's a number, add it to the values list
-                        values.add(token.toDouble())
+                        values.add(BigDecimal(token))
                     }
-                    token in listOf("+", "-", "*", "/", "%") -> {
-                        // If it's an operator, add it to the operators list
+                    token in listOf(PLUS, MINUS, MULTIPLY, DIVIDE, MODULO) -> {
                         operators.add(token)
+                    }
+                    token.startsWith(SQUARE_ROOT) -> {
+                        val number = token.substringAfter("(").substringBefore(")").toDoubleOrNull()
+                        if (number != null) {
+                            values.add(BigDecimal(Math.sqrt(number)))
+                        } else {
+                            throw IllegalArgumentException("Invalid input for square root")
+                        }
                     }
                 }
             }
 
-            // Perform calculations based on operators and values
             var result = values[0]
-
             for (i in operators.indices) {
                 val operator = operators[i]
                 val operand2 = values[i + 1]
                 result = when (operator) {
-                    "+" -> result + operand2
-                    "-" -> result - operand2
-                    "*" -> result * operand2
-                    "/" -> if (operand2 != 0.0) result / operand2 else throw ArithmeticException("Division by zero")
-                    "%" -> result % operand2
+                    PLUS -> result.add(operand2)
+                    MINUS -> result.subtract(operand2)
+                    MULTIPLY -> result.multiply(operand2)
+                    DIVIDE -> if (operand2 != BigDecimal.ZERO) result.divide(operand2, 10, RoundingMode.HALF_UP)
+                    else throw ArithmeticException("Division by zero")
+                    MODULO -> result.remainder(operand2)
                     else -> throw IllegalArgumentException("Invalid Operator")
                 }
             }
 
-            // Set the result to the display
-            binding.display.text = result.toString()
-            input = result.toString() // Store result for further operations
+            val resultString = result.stripTrailingZeros().toPlainString()
+
+            // Update the display
+            binding.display.text = resultString.toEditable()
+            input = resultString
+
+            // Create TodoModel with input and result
+            val todoModel = TodoModel(input = input_database, result = resultString)
+
+            // Insert result into the database
+            insertResult(todoModel)
+
+
         } catch (e: Exception) {
-            Toast.makeText(this, "Error in calculation : ${e.message}", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Error in calculation: ${e.message}", Toast.LENGTH_SHORT).show()
+            clearInput()
         }
     }
 
+    private fun insertResult(todoModel: TodoModel) {
+        // Launch a coroutine to insert the result into the database
+        lifecycleScope.launch {
+            try {
+                todoDao.insetTask(todoModel) // Call the suspend function within the coroutine
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "Error inserting task: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
-    // Function to clear input and reset the calculator
     private fun clearInput() {
         input = ""
-        binding.display.text = "0"
+        binding.display.text = "0".toEditable()
         operatorPressed = false
     }
 
-    // Function to delete the last character from the input
     private fun deleteLastChar() {
         if (input.isNotEmpty()) {
-            input = input.dropLast(1)
-            binding.display.text = if (input.isEmpty()) "0" else input
+            if (input.last() == ' ') {
+                input = input.dropLast(3)
+            } else {
+                input = input.dropLast(1)
+            }
+            binding.display.text = if (input.isEmpty()) "0".toEditable() else input.toEditable()
         }
+    }
+
+    private fun String.toEditable(): Editable = Editable.Factory.getInstance().newEditable(this)
+
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return super.onCreateOptionsMenu(menu)
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.history -> {
+                startActivity(Intent(this, History::class.java))
+            }
+        }
+        return super.onOptionsItemSelected(item)
     }
 }

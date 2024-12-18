@@ -1,11 +1,12 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    id("kotlin-kapt")
 }
 
 android {
     namespace 'com.example.addition'
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.example.addition"
@@ -23,6 +24,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
+
     // Enable View Binding
     viewBinding {
         enabled = true
@@ -44,7 +46,13 @@ dependencies {
     implementation libs.material
     implementation libs.androidx.activity
     implementation libs.androidx.constraintlayout
+    implementation libs.androidx.room.common
+    implementation libs.androidx.room.ktx
     testImplementation libs.junit
     androidTestImplementation libs.androidx.junit
     androidTestImplementation libs.androidx.espresso.core
+
+    // Ensure to include these Room dependencies once
+    implementation libs.androidx.room.runtime // Room runtime
+    kapt libs.androidx.room.compiler  // Room compiler for Kotlin
 }
