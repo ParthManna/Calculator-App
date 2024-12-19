@@ -79,7 +79,7 @@
                     android:layout_columnWeight="1"
                     android:layout_margin="8dp"
                     android:background="@drawable/round_button_gray"
-                    android:text="/"
+                    android:text="÷"
                     android:textColor="#009688"
                     android:textSize="30sp" />
 
@@ -108,7 +108,7 @@
                     android:gravity="center"
                     android:text="DEL"
                     android:textColor="#FFFFFF"
-                    android:textSize="29sp" />
+                    android:textSize="25sp" />
 
 
                 <!-- Row 2 (7, 8, 9, Minus) -->

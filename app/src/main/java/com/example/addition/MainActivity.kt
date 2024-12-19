@@ -93,12 +93,28 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun appendInput(value: String) {
-        if (value == "." && input.takeLastWhile { it.isDigit() || it == '.' }.contains(".")) return
-        if (value == "." && input.isEmpty()) input += "0"
-        if (operatorPressed) operatorPressed = false
-        input += value
+        if (value == ".") {
+            // Prevent multiple dots in a single number
+            if (input.takeLastWhile { it.isDigit() || it == '.' }.contains(".")) return
+            if (input.isEmpty() || input.endsWith(" ")) input += "0"
+        }
+
+        // Handle negative numbers
+        if (value == "-") {
+            // Allow '-' at the start or after an operator
+            if (input.isEmpty() || input.endsWith(" ")) {
+                input += value
+            } else {
+                return // Ignore invalid '-' placement
+            }
+        } else {
+            input += value
+        }
+
         binding.display.text = input.toEditable()
     }
+
+
 
     private fun appendOperator(operator: String) {
         if (operator == SQUARE_ROOT) {
@@ -107,24 +123,34 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        if (input.isNotEmpty() && !operatorPressed) {
+        if (input.isNotEmpty() && !operatorPressed && !input.endsWith(" ")) {
             input += " $operator "
-            binding.display.text = input.toEditable()
             operatorPressed = true
+        } else if (input.isEmpty() && operator == MINUS) {
+            // Allow '-' as the first operator for a negative number
+            input += operator
         }
+        binding.display.text = input.toEditable()
     }
+
 
     private fun calculateResult() {
         try {
-            val input_database = input
-            val tokens = input.split(" ")
+            val inputDatabase = input
+            val tokens = input.split(" ").filter { it.isNotBlank() }
             val values = mutableListOf<BigDecimal>()
             val operators = mutableListOf<String>()
 
-            for (token in tokens) {
+            var i = 0
+            while (i < tokens.size) {
+                val token = tokens[i]
                 when {
-                    token.toDoubleOrNull() != null -> {
+                    token.toBigDecimalOrNull() != null -> {
                         values.add(BigDecimal(token))
+                    }
+                    token == MINUS && (i == 0 || tokens[i - 1] in listOf(PLUS, MINUS, MULTIPLY, DIVIDE, MODULO)) -> {
+                        // Handle negative numbers
+                        values.add(BigDecimal(tokens[++i]).negate())
                     }
                     token in listOf(PLUS, MINUS, MULTIPLY, DIVIDE, MODULO) -> {
                         operators.add(token)
@@ -138,12 +164,13 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
+                i++
             }
 
             var result = values[0]
-            for (i in operators.indices) {
-                val operator = operators[i]
-                val operand2 = values[i + 1]
+            for (j in operators.indices) {
+                val operator = operators[j]
+                val operand2 = values[j + 1]
                 result = when (operator) {
                     PLUS -> result.add(operand2)
                     MINUS -> result.subtract(operand2)
@@ -161,18 +188,16 @@ class MainActivity : AppCompatActivity() {
             binding.display.text = resultString.toEditable()
             input = resultString
 
-            // Create TodoModel with input and result
-            val todoModel = TodoModel(input = input_database, result = resultString)
-
-            // Insert result into the database
+            // Save to database
+            val todoModel = TodoModel(input = inputDatabase, result = resultString)
             insertResult(todoModel)
-
 
         } catch (e: Exception) {
             Toast.makeText(this, "Error in calculation: ${e.message}", Toast.LENGTH_SHORT).show()
             clearInput()
         }
     }
+
 
     private fun insertResult(todoModel: TodoModel) {
         // Launch a coroutine to insert the result into the database
