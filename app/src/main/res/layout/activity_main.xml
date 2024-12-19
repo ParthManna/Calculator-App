@@ -68,7 +68,7 @@
                     android:layout_columnWeight="1"
                     android:layout_margin="8dp"
                     android:background="@drawable/round_button_red"
-                    android:text="AC"
+                    android:text="C"
                     android:textColor="#FFFFFF"
                     android:textSize="30sp" />
 
@@ -99,16 +99,15 @@
                     android:layout_width="0dp"
                     android:layout_height="80dp"
                     android:layout_columnWeight="1"
-                    android:layout_margin="8dp"
-                    android:background="@drawable/round_button_red"
+                    android:layout_margin="10dp"
+                    android:background="@drawable/clear_2"
                     android:contentDescription="Delete"
-                    android:drawablePadding="8dp"
                     android:elevation="4dp"
                     android:fontFamily="sans-serif-medium"
                     android:gravity="center"
-                    android:text="DEL"
+                    android:padding="10dp"
                     android:textColor="#FFFFFF"
-                    android:textSize="25sp" />
+                    android:textSize="30sp" />
 
 
                 <!-- Row 2 (7, 8, 9, Minus) -->

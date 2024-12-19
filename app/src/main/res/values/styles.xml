@@ -1,4 +1,10 @@
 <resources>
     <!-- Base style for all calculator buttons -->
+    <style name="Material" parent="Theme.MaterialComponents">
+        <!-- Customize your light theme here. -->
+        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+        <!-- Set the color of the overflow icon -->
+        <item name="colorControlNormal">@android:color/white</item>
+    </style>
 
 </resources>
